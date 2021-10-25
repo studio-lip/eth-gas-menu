@@ -1,12 +1,23 @@
 const { menubar } = require("menubar");
+const { Menu } = require("electron");
 
 const mb = menubar({
   dir: __dirname,
   index: "https://etherscan.io/gastracker",
   preloadWindow: true,
+  showDockIcon: false,
+  showOnRightClick: true,
 });
 
 mb.on("ready", () => {
+  mb.app.dock.hide()
+  const contextMenu = Menu.buildFromTemplate([
+    { label: "Show Etherscan", click: () => mb.showWindow() },
+    { label: "Quit", role: "quit" },
+  ]);
+  // mb.tray.setToolTip("Right click to quit.");
+  mb.tray.setContextMenu(contextMenu);
+  mb.tray.setTitle("Loading...");
   const content = mb.window.webContents;
   try {
     content.debugger.attach("1.3");
@@ -29,7 +40,6 @@ mb.on("ready", () => {
           })
           .then((response) => {
             const body = response.body;
-            console.log(body.slice(0, 20));
             if (body) {
               const res = JSON.parse(body);
               mb.tray.setTitle(
@@ -43,9 +53,8 @@ mb.on("ready", () => {
   });
   content.debugger.sendCommand("Network.enable");
   content.reload();
-  setInterval(content.reload, 1000);
+  setInterval(() => content.reload(), 120000);
   content.on("did-finish-load", () => {
-    console.log("load");
     content.insertCSS("header,footer {display: none!important;}", {
       cssOrigin: "user",
     });
