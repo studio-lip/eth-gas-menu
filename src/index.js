@@ -1,46 +1,90 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
+const { protocol, session } = require("electron");
+const { menubar } = require("menubar");
+// const { fetch } = require("electron-fetch").default;
+const path = require("path");
+// const remote = require('electron').remote;
+// const fs = require('fs');
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
-  app.quit();
-}
+const mb = menubar({
+  dir: __dirname,
+  index: "https://etherscan.io/gastracker",
+  preloadWindow: true,
+});
 
-const createWindow = () => {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+mb.on("ready", () => {
+  const { net } = require("electron");
+  const content = mb.window.webContents;
+  try {
+    content.debugger.attach("1.3");
+  } catch (err) {
+    console.log("Debugger attach failed: ", err);
+  }
+
+  content.debugger.on("detach", (event, reason) => {
+    console.log("Debugger detached due to: ", reason);
   });
 
-  // and load the index.html of the app.
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  content.debugger.on("message", (event, method, params) => {
+    if (method === "Network.responseReceived") {
+      if (
+        params.response.url.startsWith(
+          "https://etherscan.io/autoUpdateGasTracker"
+        )
+      ) {
+        content.debugger
+          .sendCommand("Network.getResponseBody", {
+            requestId: params.requestId,
+          })
+          .then((response) => {
+            const body = response.body;
+            console.log(body.slice(0, 20));
+            // const res = JSON.parse(body);
+            if (body) {
+              const res = JSON.parse(body);
+              mb.tray.setTitle(
+                `${res.lowPrice} | ${res.avgPrice} | ${res.highPrice}`
+              );
+            }
+          })
+          .catch((e) => console.error(e));
+      }
+    }
+  });
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
-};
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  content.debugger.sendCommand("Network.enable");
+  // protocol.interceptBufferProtocol("https", (request, result) => {
+  //   if (request.url === "http://www.google.com")
+  //     return result(content);
+  // });
+  // session.defaultSession.webRequest.onBeforeRequest(
+  //   { urls: ["https://etherscan.io/autoUpdateGasTracker.ashx?*"] },
+  //   (details, cb) => {
+  //     console.log("URL", details.url);
+  //     // if (!details.url.endsWith("&lipapp=true")) {
+  //     //   const request = net.request(`${details.url}&lipapp=true`);
+  //     //   console.log(request);
+  //     //   request.on("response", (response) => {
+  //     //     console.log(`STATUS: ${response.statusCode}`);
+  //     //     console.log(`HEADERS: ${JSON.stringify(response.headers)}`);
+  //     //     response.on("data", (chunk) => {
+  //     //       console.log(`BODY: ${chunk}`);
+  //     //     });
+  //     //     response.on("end", () => {
+  //     //       console.log("No more data in response.");
+  //     //     });
+  //     //   });
+  //     //   request.end();
+  //     // }
+  //   }
+  // );
+  // console.log(content);
+  content.reload();
+  // setInterval(content.reload, 1000);
+  content.on("did-finish-load", () => {
+    console.log("load");
+    // content.insertCSS(
+    //   fs.readFileSync(path.join(__dirname, "inject.css"), "utf8")
+    // );
+    content.insertCSS("header,footer {display: none!important;}", { cssOrigin: "user" });
+  });
 });
-
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
