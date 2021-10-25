@@ -10,11 +10,29 @@ const mb = menubar({
 });
 
 let lastID = null;
+let lastGas = null;
+let detailedTitle = true;
+
+function setTitle() {
+  const title = detailedTitle
+    ? `${lastGas.lowPrice} | ${lastGas.avgPrice} | ${lastGas.highPrice}`
+    : `${lastGas.avgPrice}`;
+  mb.tray.setTitle(title);
+}
 
 mb.on("ready", () => {
   mb.app.dock.hide();
   const contextMenu = Menu.buildFromTemplate([
     { label: "Show Etherscan", click: () => mb.showWindow() },
+    {
+      label: "Show Details",
+      type: "checkbox",
+      checked: detailedTitle,
+      click: () => {
+        detailedTitle = !detailedTitle;
+        setTitle();
+      },
+    },
     { label: "Quit", role: "quit" },
   ]);
   // mb.tray.setToolTip("Right click to quit.");
@@ -39,9 +57,8 @@ mb.on("ready", () => {
           .then((response) => {
             const body = response.body;
             if (body) {
-              const res = JSON.parse(body);
-              const title = `${res.lowPrice} | ${res.avgPrice} | ${res.highPrice}`;
-              mb.tray.setTitle(title);
+              lastGas = JSON.parse(body);
+              setTitle();
             }
           })
           .catch((e) => console.error(e));
