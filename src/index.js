@@ -9,8 +9,10 @@ const mb = menubar({
   showOnRightClick: true,
 });
 
+let lastID = null;
+
 mb.on("ready", () => {
-  mb.app.dock.hide()
+  mb.app.dock.hide();
   const contextMenu = Menu.buildFromTemplate([
     { label: "Show Etherscan", click: () => mb.showWindow() },
     { label: "Quit", role: "quit" },
@@ -28,12 +30,8 @@ mb.on("ready", () => {
     console.log("Debugger detached due to: ", reason);
   });
   content.debugger.on("message", (event, method, params) => {
-    if (method === "Network.responseReceived") {
-      if (
-        params.response.url.startsWith(
-          "https://etherscan.io/autoUpdateGasTracker"
-        )
-      ) {
+    if (method === "Network.loadingFinished") {
+      if (params.requestId === lastID) {
         content.debugger
           .sendCommand("Network.getResponseBody", {
             requestId: params.requestId,
@@ -42,12 +40,20 @@ mb.on("ready", () => {
             const body = response.body;
             if (body) {
               const res = JSON.parse(body);
-              mb.tray.setTitle(
-                `${res.lowPrice} | ${res.avgPrice} | ${res.highPrice}`
-              );
+              const title = `${res.lowPrice} | ${res.avgPrice} | ${res.highPrice}`;
+              mb.tray.setTitle(title);
             }
           })
           .catch((e) => console.error(e));
+      }
+    }
+    if (method === "Network.responseReceived") {
+      if (
+        params.response.url.startsWith(
+          "https://etherscan.io/autoUpdateGasTracker"
+        )
+      ) {
+        lastID = params.requestId;
       }
     }
   });
