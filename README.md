@@ -1,4 +1,7 @@
 # eth-gas-menu
+
+![Screenshot](example.png)
+
 A tiny menubar app for tracking ethereum gas.
 
 Run `yarn` to install dependencies.
